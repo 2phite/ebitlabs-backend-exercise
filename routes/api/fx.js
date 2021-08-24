@@ -48,4 +48,55 @@ router.get('/ohlc/:pair', (req, res) => {
   })
 })
 
+
+router.get('/ohlc/:pair/history', (req, res) => {
+  let pair = undefined
+  if (pair_dict[req.params.pair]) {
+    console.log(pair_dict[req.params.pair])
+    pair = pair_dict[req.params.pair]
+  } else {
+    console.log('Pair name not found')
+    res.status(404)
+    res.json({'msg': 'Pair name not found'})
+    return
+  }
+
+  let db = new sqlite3.Database(db_path, (err) => {
+    if (err) {
+      console.error(err.message)
+    }
+    console.log('Connected to the file database.')
+
+    db.serialize(() => {
+      let sql = `SELECT ? AS pair, DATE(startTime, 'unixepoch') AS date
+        , MAX(high) AS maxHigh, MIN(low) AS minLow
+        FROM market_price
+        WHERE pair = ?
+        GROUP BY date
+        ORDER BY startTime ASC`
+      db.all(sql, [pair, pair], (err, rows) => {
+        if (err) {
+          console.error(err.message)
+          res.status(404)
+          res.json({'msg': 'Data not found'})
+        } else {
+          console.log(rows)
+          let out = []
+          rows.forEach(row => {
+            out.push(Object.values(row))
+          });
+          res.json(out)
+        }
+      })
+    })
+
+    db.close((err) => {
+      if (err) {
+        console.error(err.message)
+      }
+      console.log('Close the database connection.')
+    })
+  })
+})
+
 module.exports = router
